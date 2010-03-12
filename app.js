@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/opt/local/agents/smart-key-manager/local/bin/node
 
 // Smart Key Manager... manages user ssh keys for gitosis
 
@@ -6,7 +6,7 @@ var AGENT_NAME = 'smart-key-manager';
 var VERSION = '0.01';
 
 var sys   = require('sys');
-var posix = require('fs'); 
+var fs    = require('fs'); 
 var path  = require('path');
 var path  = require('path');
 var ini   = require('ini');
@@ -40,6 +40,7 @@ var connectionReadyHandle = function(connection) {
   
   var exchange = connection.exchange(config.amqp.repository_key_registration_exchange);  
   var queue = connection.queue(AGENT_NAME);
+  sys.puts("[INFO] using QUEUE " + AGENT_NAME);  
   
   queue.subscribe(function (message) {
     message.addListener('data', function (d) {        
@@ -50,7 +51,7 @@ var connectionReadyHandle = function(connection) {
           var key = data['key'];
 
           try {
-            add_user_key(user, key);
+            add_user_key(user, key, connection.config);
           } catch(e){
             sys.debug("[ERROR] Can't add user key: " + e);
           }
@@ -81,11 +82,12 @@ var setup_connection = function(prev, curr) {
     sys.puts("[INFO] Starting up...");
   }
 
-  posix.readFile(gitosisConfig, function(e, d) {
+  fs.readFile(gitosisConfig, function(e, d) {
     if(e){
-      sys.puts("[WARNING] Unable to read configuration file: " + gitosisConfig);
+      sys.puts("[WARNING] Unable to read configuration file: " + gitosisConfig + " : " + e);
     } else {
       var config;
+      
       try {
         config = ini.parse(d);
       } catch(err) {
@@ -109,10 +111,66 @@ var setup_connection = function(prev, curr) {
 };
 
 // We want to be able to change configuration on the fly, so we may need to reconnect, etc.
-posix.watchFile(gitosisConfig, { persistent: true, interval: 10000 }, setup_connection);
+fs.watchFile(gitosisConfig, { persistent: true, interval: 10000 }, setup_connection);
 setup_connection();
 
-var add_user_key = function(user, key) {
-    sys.puts("[ERROR] add_user_key functionality is not yet implemented");
+var add_user_key = function(user, key, config) {
+    // 1 check and remove email from key
+
+    var username = key.split("==")[1];
+    if (username !== user) {
+      key = key.split("==")[0] + "== " + user; 
+    }
+    
+    try {
+      var keytmp = config.keymanager.keydir;
+    } catch(e) {
+      sys.puts("[ERROR] Unable to load key dir from config");
+    }
+
+    var pubPath = path.join(keytmp, user + ".pub");
+    
+    path.exists(keytmp, function (exists) {
+    
+      if (exists) {
+        // Does a key already exist for this user?
+        path.exists(pubPath, function (exists) {
+          if (exists) {
+            sys.puts("[INFO] Overriding existing key file for user");
+          } else {
+            sys.puts("[INFO] New User (" + user + ") key added to system.");
+          }
+
+          fs.writeFile(pubPath, key, function (err) {
+            if (err) throw err;
+            
+            executeCmd("(cd "+keytmp+ "; /opt/local/bin/git pull )",function() {
+              executeCmd("(cd "+keytmp+ "; /opt/local/bin/git add " + pubPath + ") ",function() {
+                executeCmd("(cd "+keytmp+ "; /opt/local/bin/git commit -am 'Adding key for user "+user+"') ",function() {
+                  sys.puts("[INFO] Complete");
+                });          
+              });
+            });
+
+          });          
+        });
+        
+      } else {
+        sys.puts("[ERROR] no key directory created - (" + keytmp + ")");
+      }
+    });
+
+    // sys.puts("[ERROR] add_user_key functionality is not yet implemented " + user + " " + key);
 };
 
+var executeCmd = function(cmd, callback) {
+  sys.exec(cmd, function (err, stdout, stderr) {
+    if (err) {
+      sys.puts("[ERROR] Could not run command '" + cmd + "'" + ": " + err);
+    } else {
+      sys.puts("[INFO] Done processing command " + cmd);
+    }
+    
+    if (typeof callback == 'function') callback();    
+  });  
+}
