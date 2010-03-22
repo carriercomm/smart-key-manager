@@ -40,6 +40,8 @@ var connectionReadyHandle = function(connection) {
   
   var exchange = connection.exchange(config.amqp.repository_key_registration_exchange);  
   var queue = connection.queue(AGENT_NAME);
+  queue.bind(exchange, config.amqp.repository_key_registration_exchange);  
+  
   sys.puts("[INFO] using QUEUE " + AGENT_NAME);  
   
   queue.subscribe(function (message) {
