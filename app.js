@@ -40,8 +40,6 @@ var connectionReadyHandle = function(connection) {
   
   var exchange = connection.exchange(config.amqp.repository_key_registration_exchange);  
   var queue = connection.queue(AGENT_NAME);
-  queue.bind(exchange, config.amqp.repository_key_registration_exchange);  
-  
   sys.puts("[INFO] using QUEUE " + AGENT_NAME);  
   
   queue.subscribe(function (message) {
@@ -124,46 +122,59 @@ var add_user_key = function(user, key, config) {
       key = key.split("==")[0] + "== " + user; 
     }
     
-    try {
-      var keytmp = config.keymanager.keydir;
-    } catch(e) {
-      sys.puts("[ERROR] Unable to load key dir from config");
-    }
-
-    var pubPath = path.join(keytmp, user + ".pub");
+    var keytmp = path.join(__dirname,"gitosis-admin");
     
+    // git@yourgitserver.local:gitosis-admin.git /opt/local/agents/smart-key-manager
+    cloneUri = config.rsp['git_user'] + "@" + config.rsp['git_server'] + ":gitosis-admin.git";
+
     path.exists(keytmp, function (exists) {
-    
-      if (exists) {
-        // Does a key already exist for this user?
-        path.exists(pubPath, function (exists) {
-          if (exists) {
-            sys.puts("[INFO] Overriding existing key file for user");
-          } else {
-            sys.puts("[INFO] New User (" + user + ") key added to system.");
-          }
-
-          fs.writeFile(pubPath, key, function (err) {
-            if (err) throw err;
-            
-            executeCmd("(cd "+keytmp+ "; /opt/local/bin/git pull )",function() {
-              executeCmd("(cd "+keytmp+ "; /opt/local/bin/git add " + pubPath + ") ",function() {
-                executeCmd("(cd "+keytmp+ "; /opt/local/bin/git commit -am 'Adding key for user "+user+"') ",function() {
-                  sys.puts("[INFO] Complete");
-                });          
-              });
-            });
-
-          });          
-        });
-        
+      if (!exists) {
+        cmd = "/opt/local/bin/git clone " + cloneUri + " " + __dirname;
       } else {
-        sys.puts("[ERROR] no key directory created - (" + keytmp + ")");
+        cmd = "/opt/local/bin/git pull";
       }
-    });
+      
+      executeCmd("(cd "+ __dirname +"; " + cmd + ")",function() {
+        commitFile(path.join(keytmp,"keydir") , user);
+      });                  
+    });    
 
-    // sys.puts("[ERROR] add_user_key functionality is not yet implemented " + user + " " + key);
 };
+
+var commitFile = function(keytmp, user) {
+  
+  var pubPath = path.join(keytmp, user + ".pub");
+  
+  path.exists(keytmp, function (exists) {
+  
+    if (exists) {
+      // Does a key already exist for this user?
+      path.exists(pubPath, function (exists) {
+        if (exists) {
+          sys.puts("[INFO] Overriding existing key file for user");
+        } else {
+          sys.puts("[INFO] New User (" + user + ") key added to system.");
+        }
+  
+        fs.writeFile(pubPath, key, function (err) {
+          if (err) throw err;
+          
+          executeCmd("(cd "+keytmp+ "; /opt/local/bin/git pull )",function() {
+            executeCmd("(cd "+keytmp+ "; /opt/local/bin/git add " + pubPath + ") ",function() {
+              executeCmd("(cd "+keytmp+ "; /opt/local/bin/git commit -am 'Adding key for user "+user+"') ",function() {
+                sys.puts("[INFO] Complete");
+              });          
+            });
+          });
+  
+        });          
+      });
+      
+    } else {
+      sys.puts("[ERROR] no key directory created - (" + keytmp + ")");
+    }
+  });  
+}
 
 var executeCmd = function(cmd, callback) {
   sys.exec(cmd, function (err, stdout, stderr) {
