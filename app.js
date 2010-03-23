@@ -129,7 +129,7 @@ var add_user_key = function(user, key, config) {
 
     path.exists(keytmp, function (exists) {
       if (!exists) {
-        cmd = "/opt/local/bin/git clone " + cloneUri + " " + __dirname;
+        cmd = "/opt/local/bin/git clone " + cloneUri;
       } else {
         cmd = "/opt/local/bin/git pull";
       }
