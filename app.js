@@ -130,13 +130,16 @@ var add_user_key = function(user, key, config) {
     path.exists(keytmp, function (exists) {
       if (!exists) {
         cmd = "/opt/local/bin/git clone " + cloneUri;
+        executeCmd("(cd "+ __dirname +"; " + cmd + ")",function() {
+          commitFile(path.join(keytmp,"keydir") , user, key);
+        });        
       } else {
-        cmd = "/opt/local/bin/git pull";
+        cmd = "/opt/local/bin/git pull ";
+        executeCmd("(cd "+ keytmp +"; " + cmd + ")",function() {
+          commitFile(path.join(keytmp,"keydir") , user, key);
+        });        
       }
       
-      executeCmd("(cd "+ __dirname +"; " + cmd + ")",function() {
-        commitFile(path.join(keytmp,"keydir") , user, key);
-      });                  
     });    
 
 };
@@ -162,7 +165,9 @@ var commitFile = function(keytmp, user, key) {
           executeCmd("(cd "+keytmp+ "; /opt/local/bin/git pull )",function() {
             executeCmd("(cd "+keytmp+ "; /opt/local/bin/git add " + pubPath + ") ",function() {
               executeCmd("(cd "+keytmp+ "; /opt/local/bin/git commit -am 'Adding key for user "+user+"') ",function() {
-                sys.puts("[INFO] Complete");
+                executeCmd("(cd "+keytmp+ "; /opt/local/bin/git push') ",function() {
+                  sys.puts("[INFO] Complete");
+                });                          
               });          
             });
           });
