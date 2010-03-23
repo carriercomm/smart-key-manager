@@ -165,7 +165,7 @@ var commitFile = function(keytmp, user, key) {
           executeCmd("(cd "+keytmp+ "; /opt/local/bin/git pull )",function() {
             executeCmd("(cd "+keytmp+ "; /opt/local/bin/git add " + pubPath + ") ",function() {
               executeCmd("(cd "+keytmp+ "; /opt/local/bin/git commit -am 'Adding key for user "+user+"') ",function() {
-                executeCmd("(cd "+keytmp+ "; /opt/local/bin/git push') ",function() {
+                executeCmd("(cd "+keytmp+ "; /opt/local/bin/git push) ",function() {
                   sys.puts("[INFO] Complete");
                 });                          
               });          
