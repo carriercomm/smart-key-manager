@@ -135,13 +135,13 @@ var add_user_key = function(user, key, config) {
       }
       
       executeCmd("(cd "+ __dirname +"; " + cmd + ")",function() {
-        commitFile(path.join(keytmp,"keydir") , user);
+        commitFile(path.join(keytmp,"keydir") , user, key);
       });                  
     });    
 
 };
 
-var commitFile = function(keytmp, user) {
+var commitFile = function(keytmp, user, key) {
   
   var pubPath = path.join(keytmp, user + ".pub");
   
